@@ -130,6 +130,10 @@ module memory_firewall_top (
         .fwd_locked_regions_s2(fwd_locked_regions_s2)
     );
 
+    // Apply forwarding to access control decision
+    wire is_locked_s2 = fwd_locked_regions_s2[region_s2];
+    wire is_valid_s2_final = is_valid_s2_comb && !is_locked_s2;
+
     intrusion_detection u_intrusion_detection (
         .is_valid(is_valid_s3),
         .is_locked(is_locked_s3),
@@ -178,15 +182,16 @@ module memory_firewall_top (
     );
 
     // Filter properties going into FSM based on Valid ID
-    wire fsm_request_trigger = valid_s3 ? addr_s3 : 32'hFFFF_FFFF; 
+    wire fsm_valid = valid_s3;
+    wire intrusion_detected_to_fsm = fsm_valid ? intrusion_detected : 1'b0;
     
     fsm_controller u_fsm_controller (
         .clk(clk),
         .reset(reset),
-        .address(fsm_request_trigger),
+        .address(addr_s3),
         .rw(rw_s3),
         .privilege(priv_s3),
-        .intrusion_detected(intrusion_detected),
+        .intrusion_detected(intrusion_detected_to_fsm),
         .log_en(fsm_log_en),
         .access_granted(access_granted),
         .access_denied(access_denied),
@@ -241,7 +246,7 @@ module memory_firewall_top (
             rw_s3    <= rw_s2;
             priv_s3  <= priv_s2;
             region_s3 <= region_s2;
-            is_valid_s3 <= is_valid_s2_comb;
+            is_valid_s3 <= valid_s2 ? is_valid_s2_final : 1'b0;
         end
     end
 
